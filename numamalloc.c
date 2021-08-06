@@ -6,7 +6,7 @@
 static MPI_Win  nodewin  = MPI_WIN_NULL;
 static MPI_Comm nodecomm = MPI_COMM_NULL;
 
-void *numamalloc(size_t itemsize, size_t nitem)
+void *numamalloc(size_t itemsize, size_t nitem, MPI_Comm *comm, MPI_Win *win)
 {
   int i, rank, nodesize, noderank;
   MPI_Aint winsize;
@@ -63,9 +63,19 @@ void *numamalloc(size_t itemsize, size_t nitem)
       s[i] = '\0';
     }
 
+  // Set the node communicator and window so the user has a copy
+
+  *comm = nodecomm;
+  *win  = nodewin;
+
   // Return the same pointer to each process, i.e. from rank 0
 
   MPI_Win_shared_query(nodewin, 0, &winsize, &disp, &x0);
+
+  // Ensure everyone is finished
+
+  MPI_Win_fence(0, nodewin);
+
   return x0;
 }
 

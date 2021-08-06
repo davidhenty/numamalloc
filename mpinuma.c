@@ -10,11 +10,14 @@ int getnumanode(void *ptr);
   
 int main(int argc, char **argv)
 {
-  int disp_unit, rank, size;
+  int disp_unit, rank, size, noderank, nodesize;
   
   int *x, *y;
   
   int n, i, i0, i1, irank;
+
+  MPI_Comm nodecomm;
+  MPI_Win  nodewin;
 
   n = 8*1024*1024;
   // n = 5;
@@ -28,16 +31,37 @@ int main(int argc, char **argv)
 
   printlocation();
 
-  x = (int *) numamalloc(sizeof(int), n);
+  x = (int *) numamalloc(sizeof(int), n, &nodecomm, &nodewin);
   y = (int *) malloc(sizeof(int)*n);
 
-  // Initialise
+  // Set default values
 
   for (i=0; i < n; i++)
     {
-      x[i] = i;
-      y[i] = i;
+      x[i] = -1;
+      y[i] = -1;
     }
+
+
+  MPI_Comm_size(nodecomm, &nodesize);
+  MPI_Comm_rank(nodecomm, &noderank);
+
+  // Initialise on node rank 0 only
+
+  if (0 == noderank)
+    {
+      printf("rank %d initialising\n", rank);
+
+      for (i=0; i < n; i++)
+	{
+	  x[i] = i;
+	  y[i] = i;
+	}
+    }
+
+  // Wait for initialisation to complete
+
+  MPI_Win_fence(0, nodewin);
 
   for (irank=0; irank < size; irank++)
     {
@@ -57,6 +81,7 @@ int main(int argc, char **argv)
     }
 
   numafree(x);
+  free(y);
 
   // Finish
 
